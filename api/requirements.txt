@@ -24,8 +24,12 @@ jinja2==3.0.3
     # via flask
 markupsafe==2.0.1
     # via jinja2
-pymongo==4.0.1
+marshmallow==3.14.1
     # via -r requirements.in
+pymodm==0.4.3
+    # via -r requirements.in
+pymongo==3.12.3
+    # via pymodm
 requests==2.27.1
     # via -r requirements.in
 typing-extensions==4.0.1

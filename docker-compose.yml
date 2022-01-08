@@ -1,0 +1,28 @@
+version: '3.3'
+
+services:
+  db:
+    logging:
+      driver: none
+    image: mongo:4.2-bionic
+    expose:
+      - "27017"
+    volumes:
+      - /var/db:/data/db
+  scheduler:
+    build: 
+      context: scheduler/
+      dockerfile: Dockerfile
+    image: scheduler
+    depends_on:
+      - db
+  api:
+    build: 
+      context: api/
+      dockerfile: Dockerfile
+    image: api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - scheduler

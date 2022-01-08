@@ -1,0 +1,5 @@
+apscheduler
+pika
+marshmallow
+requests
+pymongo>=3.0
