@@ -9,6 +9,15 @@ services:
       - "27017"
     volumes:
       - /var/db:/data/db
+  mq:
+    logging:
+      driver: none
+    image: rabbitmq:3.9
+    hostname: 'mq'
+    expose:
+      - "5672"
+    volumes:
+      - "/var/mq:/var/lib/rabbitmq/mnesia"
   scheduler:
     build: 
       context: scheduler/
