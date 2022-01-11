@@ -5,19 +5,23 @@ services:
     logging:
       driver: none
     image: mongo:4.2-bionic
-    expose:
-      - "27017"
+    ports:
+      - "27017:27017"
     volumes:
       - /var/db:/data/db
+      
   mq:
     logging:
       driver: none
-    image: rabbitmq:3.9
+    image: rabbitmq:3.9-management
     hostname: 'mq'
     expose:
       - "5672"
+    ports:
+      - "15672:15672"
     volumes:
       - "/var/mq:/var/lib/rabbitmq/mnesia"
+
   scheduler:
     build: 
       context: scheduler/
@@ -25,6 +29,8 @@ services:
     image: scheduler
     depends_on:
       - db
+      - mq
+
   api:
     build: 
       context: api/
@@ -33,5 +39,6 @@ services:
     ports:
       - "8000:8000"
     depends_on:
+      - mq
       - db
       - scheduler

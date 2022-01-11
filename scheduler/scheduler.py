@@ -3,9 +3,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import logging
 from marshmallow.exceptions import ValidationError
 import pika
+import pymongo
 import requests
 from requests.models import HTTPError
 import sys
+import time
 
 from schemas import Timer
 
@@ -20,35 +22,71 @@ logger.addHandler(handler)
 
 # ----------------------------------------------------------------------------
 
+# def retry_on_exception(callable, exceptions, retries, retry_time, *args, **kwargs):
+#     retries_left = retries
+#     try:
+#         if retries_left:
+#             return callable(*args, **kwargs)
+#         else:
+
+#     except exceptions:
+#         retries_left -= 1
+#         time.sleep(retry_time)
+
 
 class TimerExecuter:
     def __init__(self):
         self.scheduler = self._start_scheduler()
-        self._start_consumer("192.168.0.158", "timers", self._add_job)
+        self._start_consumer("mq", "timers", self._add_job)
 
     def _start_scheduler(self):
-        scheduler = BackgroundScheduler(timezone="UTC")
-        scheduler.add_jobstore(
-            jobstore="mongodb",
-            alias="mongodb",
-            collection="timer-jobs",
-            host="192.168.0.158",
-            port=27017,
-        )
-        scheduler.start()
+        retries = 3
+        while retries > 0:
+            try:
+                scheduler = BackgroundScheduler(timezone="UTC")
+                scheduler.add_jobstore(
+                    jobstore="mongodb",
+                    collection="timer-jobs",
+                    host="mongodb://db:27017",
+                )
+                scheduler.start()
+                retries = 0
+            except pymongo.errors.ConnectionFailure as e:
+                pass
+
+            retries -= 1
+            time.sleep(1)
 
         return scheduler
 
     def _start_consumer(self, broker_host, message_queue, callback):
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=broker_host)
-        )
-        channel = connection.channel()
-        channel.queue_declare(queue=message_queue)
-        channel.basic_consume(queue=message_queue, on_message_callback=callback)
+        retries = 3
+        while retries:
+            time.sleep(10)
 
-        logger.info("Starting consumer --------")
-        channel.start_consuming()
+            try:
+                connection = pika.BlockingConnection(
+                    pika.ConnectionParameters(host=broker_host, port=5672)
+                )
+
+                channel = connection.channel()
+                channel.exchange_declare(
+                    exchange="timeit", durable=True, exchange_type="topic"
+                )
+                channel.queue_declare(queue=message_queue, durable=True)
+                channel.queue_bind(
+                    exchange="timeit", queue=message_queue, routing_key=message_queue
+                )
+                channel.basic_consume(message_queue, callback)
+
+                retries = 0
+                channel.start_consuming()
+
+            except pika.exceptions.AMQPConnectionError as e:
+                print("error")
+                pass
+
+            retries -= 1
 
     def _add_job(self, ch, method, properties, body):
         try:
@@ -73,7 +111,6 @@ class TimerExecuter:
             args=[url, id],
             next_run_time=run_time,
             misfire_grace_time=None,
-            jobstore="mongodb",
         )
 
         ch.basic_ack(delivery_tag=method.delivery_tag)

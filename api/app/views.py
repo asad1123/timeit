@@ -7,9 +7,11 @@ from flask import json, jsonify, request, abort
 from flask.views import MethodView
 from flask.wrappers import Response
 from marshmallow.exceptions import ValidationError
+import pymodm
 
 from .models import Timer
 from .schemas import TimerSchema
+from . import mq_client
 
 # ----------------------------------------------------------------------------
 
@@ -44,9 +46,6 @@ class ApiView(MethodView):
         return data
 
 
-# ----------------------------------------------------------------------------
-
-
 class TimerView(ApiView):
 
     serializer = TimerSchema()
@@ -54,11 +53,26 @@ class TimerView(ApiView):
     model = Timer
 
     def get(self, id: str) -> Union[Dict, List[Dict]]:
+        current_time = int(time.time())
 
-        if id is not None:
-            resp = id
+        timer = self._get_by_id(id)
 
-        return self.schema.dump({"id": uuid4(), "time_left": 45, "abca": "fajsdf"})
+        time_to_trigger = timer.expiry_time - current_time
+        if time_to_trigger < 0:
+            time_to_trigger = 0
+
+        return self.serializer.dump({"id": timer.id, "time_left": time_to_trigger})
+
+    def _get_by_id(self, id):
+        try:
+            return Timer.objects.get({"_id": id})
+        except Timer.DoesNotExist:
+            abort(
+                Response(
+                    status=HTTPStatus.NOT_FOUND,
+                    response=json.dumps({"error": f"timer id {id} does not exist"}),
+                )
+            )
 
     def post(self) -> Dict:
 
@@ -67,7 +81,11 @@ class TimerView(ApiView):
         now = int(time.time())
         delta = body["hours"] * 60 * 60 + body["minutes"] * 60 + body["seconds"]
         expiry = now + delta
+        url = body["url"]
 
-        timer: Timer = Timer(id=uuid4(), expiry_time=expiry).save()
+        timer = Timer(id=uuid4(), expiry_time=expiry, url=url).save()
+
+        message = {"id": str(timer.id), "url": timer.url, "expiry_time": expiry}
+        mq_client.publish("timers", json.dumps(message))
 
         return self.serializer.dump({"id": timer.id})
