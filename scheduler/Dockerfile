@@ -20,6 +20,6 @@ FROM base
 WORKDIR /app
 
 COPY --from=builder /install /usr/local
-COPY scheduler.py schemas.py /app/
+COPY scheduler.py schemas.py settings.py /app/
 
 CMD [ "python", "scheduler.py" ]

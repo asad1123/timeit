@@ -30,6 +30,13 @@ services:
     depends_on:
       - db
       - mq
+    environment:
+      MONGO_URI: ${MONGO_URI}
+      MONGO_JOB_SCHEDULER_COLLECTION: ${MONGO_JOB_SCHEDULER_COLLECTION}
+      MQ_BROKER_HOST: ${MQ_BROKER_HOST}
+      MQ_BROKER_PORT: ${MQ_BROKER_PORT}
+      MQ_QUEUE_NAME: ${MQ_QUEUE_NAME}
+      MQ_EXCHANGE: ${MQ_EXCHANGE}
 
   api:
     build: 
@@ -42,3 +49,9 @@ services:
       - mq
       - db
       - scheduler
+    environment:
+      MONGO_URI: ${MONGO_URI}
+      MONGO_TIMER_STORAGE_COLLECTION: ${MONGO_TIMER_STORAGE_COLLECTION}
+      MQ_BROKER_HOST: ${MQ_BROKER_HOST}
+      MQ_BROKER_PORT: ${MQ_BROKER_PORT}
+      MQ_QUEUE_NAME: ${MQ_QUEUE_NAME}

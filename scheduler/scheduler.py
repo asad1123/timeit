@@ -10,6 +10,7 @@ import sys
 import time
 
 from schemas import Timer
+import settings
 
 # ----------------------------------------------------------------------------
 
@@ -22,32 +23,29 @@ logger.addHandler(handler)
 
 # ----------------------------------------------------------------------------
 
-# def retry_on_exception(callable, exceptions, retries, retry_time, *args, **kwargs):
-#     retries_left = retries
-#     try:
-#         if retries_left:
-#             return callable(*args, **kwargs)
-#         else:
-
-#     except exceptions:
-#         retries_left -= 1
-#         time.sleep(retry_time)
-
 
 class TimerExecuter:
     def __init__(self):
         self.scheduler = self._start_scheduler()
-        self._start_consumer("mq", "timers", self._add_job)
+        self._start_consumer(
+            settings.MQ_BROKER_HOST,
+            settings.MQ_BROKER_PORT,
+            settings.MQ_EXCHANGE,
+            settings.MQ_QUEUE_NAME,
+            self._add_job,
+        )
 
     def _start_scheduler(self):
         retries = 3
         while retries > 0:
+            time.sleep(1)
+
             try:
                 scheduler = BackgroundScheduler(timezone="UTC")
                 scheduler.add_jobstore(
                     jobstore="mongodb",
-                    collection="timer-jobs",
-                    host="mongodb://db:27017",
+                    collection=settings.MONGO_JOB_SCHEDULER_COLLECTION,
+                    host=settings.MONGO_URI,
                 )
                 scheduler.start()
                 retries = 0
@@ -55,27 +53,34 @@ class TimerExecuter:
                 pass
 
             retries -= 1
-            time.sleep(1)
 
         return scheduler
 
-    def _start_consumer(self, broker_host, message_queue, callback):
+    def _start_consumer(
+        self, broker_host, broker_port, exchange, message_queue, callback
+    ):
         retries = 3
         while retries:
+
+            # this is a bit of a hacky solution
+            # to make sure the scheduler waits for the rabbitMQ container
+            # to be ready before starting the consumer.
+            # in production, we would do this in a more fault tolerant
+            # fashion via something like health checks.
             time.sleep(10)
 
             try:
                 connection = pika.BlockingConnection(
-                    pika.ConnectionParameters(host=broker_host, port=5672)
+                    pika.ConnectionParameters(host=broker_host, port=broker_port)
                 )
 
                 channel = connection.channel()
                 channel.exchange_declare(
-                    exchange="timeit", durable=True, exchange_type="topic"
+                    exchange=exchange, durable=True, exchange_type="topic"
                 )
                 channel.queue_declare(queue=message_queue, durable=True)
                 channel.queue_bind(
-                    exchange="timeit", queue=message_queue, routing_key=message_queue
+                    exchange=exchange, queue=message_queue, routing_key=message_queue
                 )
                 channel.basic_consume(message_queue, callback)
 

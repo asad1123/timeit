@@ -5,11 +5,18 @@ import pika
 # ----------------------------------------------------------------------------
 
 
+class MqConnectionError(Exception):
+    pass
+
+
+# ----------------------------------------------------------------------------
+
+
 class MessageQueueClient:
-    def __init__(self, broker_host, message_queue):
+    def __init__(self, broker_host, broker_port):
 
         self.broker_host = broker_host
-        self.message_queue = message_queue
+        self.broker_port = broker_port
 
         self.connection = None
         retries = 3
@@ -24,11 +31,11 @@ class MessageQueueClient:
                 time.sleep(3)
 
         if not self.channel:
-            raise Exception()
+            raise MqConnectionError("Could not connect to MQ broker")
 
     def _connect(self):
         self.connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=self.broker_host, port=5672)
+            pika.ConnectionParameters(host=self.broker_host, port=self.broker_port)
         )
 
         self.channel = self.connection.channel()

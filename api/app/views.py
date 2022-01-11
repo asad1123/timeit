@@ -11,7 +11,7 @@ import pymodm
 
 from .models import Timer
 from .schemas import TimerSchema
-from . import mq_client
+from . import app_config, mq_client
 
 # ----------------------------------------------------------------------------
 
@@ -45,6 +45,17 @@ class ApiView(MethodView):
 
         return data
 
+    def get_or_404(self, id):
+        try:
+            return self.model.objects.get({"_id": id})
+        except self.model.DoesNotExist:
+            abort(
+                Response(
+                    status=HTTPStatus.NOT_FOUND,
+                    response=json.dumps({"error": f"id {id} could not be found"}),
+                )
+            )
+
 
 class TimerView(ApiView):
 
@@ -55,37 +66,32 @@ class TimerView(ApiView):
     def get(self, id: str) -> Union[Dict, List[Dict]]:
         current_time = int(time.time())
 
-        timer = self._get_by_id(id)
+        timer = self.get_or_404(id)
 
+        # compute time to trigger this timer job
+        # return 0 if that time has already elapsed
         time_to_trigger = timer.expiry_time - current_time
         if time_to_trigger < 0:
             time_to_trigger = 0
 
         return self.serializer.dump({"id": timer.id, "time_left": time_to_trigger})
 
-    def _get_by_id(self, id):
-        try:
-            return Timer.objects.get({"_id": id})
-        except Timer.DoesNotExist:
-            abort(
-                Response(
-                    status=HTTPStatus.NOT_FOUND,
-                    response=json.dumps({"error": f"timer id {id} does not exist"}),
-                )
-            )
-
     def post(self) -> Dict:
 
         body = self.get_request_data()
 
+        # we will compute the expiry as a UTC epoch
+        # this is what we will store in the database
         now = int(time.time())
         delta = body["hours"] * 60 * 60 + body["minutes"] * 60 + body["seconds"]
         expiry = now + delta
+
         url = body["url"]
 
         timer = Timer(id=uuid4(), expiry_time=expiry, url=url).save()
 
+        # put this timer on the queue for processing
         message = {"id": str(timer.id), "url": timer.url, "expiry_time": expiry}
-        mq_client.publish("timers", json.dumps(message))
+        mq_client.publish(app_config["MQ_QUEUE_NAME"], json.dumps(message))
 
         return self.serializer.dump({"id": timer.id})
