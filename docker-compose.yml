@@ -5,20 +5,18 @@ services:
     logging:
       driver: none
     image: mongo:4.2-bionic
-    ports:
-      - "27017:27017"
+    expose:
+      - "27017"
     volumes:
       - /var/db:/data/db
       
   mq:
     logging:
       driver: none
-    image: rabbitmq:3.9-management
+    image: rabbitmq:3.9
     hostname: 'mq'
     expose:
       - "5672"
-    ports:
-      - "15672:15672"
     volumes:
       - "/var/mq:/var/lib/rabbitmq/mnesia"
 
