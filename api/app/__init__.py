@@ -7,8 +7,8 @@ from .mq import mq
 # ----------------------------------------------------------------------------
 
 app = Flask(__name__)
-app.config.from_object(settings)
 
+app.config.from_object(settings)
 app_config = app.config
 
 connect(f"{app.config['MONGO_URI']}/{app.config['MONGO_TIMER_STORAGE_COLLECTION']}")

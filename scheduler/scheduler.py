@@ -14,12 +14,9 @@ import settings
 
 # ----------------------------------------------------------------------------
 
+format = "%(levelname)s %(asctime)s - %(message)s"
+logging.basicConfig(stream=sys.stdout, format=format, level=logging.INFO)
 logger = logging.getLogger(__name__)
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
 
 # ----------------------------------------------------------------------------
 
@@ -48,6 +45,7 @@ class TimerExecuter:
                     host=settings.MONGO_URI,
                 )
                 scheduler.start()
+                logger.info("Started job scheduler")
                 retries = 0
             except pymongo.errors.ConnectionFailure as e:
                 pass
@@ -85,6 +83,7 @@ class TimerExecuter:
                 channel.basic_consume(message_queue, callback)
 
                 retries = 0
+                logger.info("Start queue consumer")
                 channel.start_consuming()
 
             except pika.exceptions.AMQPConnectionError as e:
@@ -110,11 +109,14 @@ class TimerExecuter:
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
+        logger.debug(f"added URL: {url} ID: {id}")
         self.scheduler.add_job(
             func=send_webhook,
             trigger="date",
             args=[url, id],
             next_run_time=run_time,
+            # this notifies the scheduler to always retry the job in the case of a missed job
+            # (i.e. in the case of a reboot)
             misfire_grace_time=None,
         )
 
