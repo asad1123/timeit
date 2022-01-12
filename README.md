@@ -64,4 +64,4 @@ This project has been containerized. There is a helper script called `run.sh`. T
 ./run.sh
 ```
 
-This will then launch the MongoDB and RabbitMQ containers (these containers will NOT be exposed outside of the internal Docker network), after which it will launch the API (broadcasting on :8000) and scheduler containers. Both MongoDB and RabbitMQ containers are also volume mounted to the host, so even if the whole application goes down, the application will be able to retain data on next boot.
+This will then launch the MongoDB and RabbitMQ containers (these containers will NOT be exposed outside of the internal Docker network), after which it will launch the API (broadcasting on :8000 by default) and scheduler containers. Both MongoDB and RabbitMQ containers are also volume mounted to the host, so even if the whole application goes down, the application will be able to retain data on next boot. All configuration has been done via Docker Compose, and can be modified as needed. 
