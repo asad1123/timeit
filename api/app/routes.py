@@ -14,13 +14,6 @@ blueprint.add_url_rule(
     methods=["GET"],
 )
 
-blueprint.add_url_rule(
-    "/timers",
-    defaults={"id": None},
-    view_func=timers_view,
-    methods=["GET"],
-)
-
 blueprint.add_url_rule("/timers", view_func=timers_view, methods=["POST"])
 
 app.register_blueprint(blueprint, url_prefix="/api/v1")
